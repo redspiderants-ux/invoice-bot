@@ -87,7 +87,8 @@ def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     update.message.reply_text("Invoice canceled.")
     return ConversationHandler.END
 
-app = ApplicationBuilder().token("YOUR_BOT_TOKEN_HERE").build()
+import os
+app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
 
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler('newinvoice', new_invoice)],
