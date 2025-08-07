@@ -1,55 +1,60 @@
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, ContextTypes,
+    MessageHandler, filters, ConversationHandler
+)
+
+import os
+import re
+import math
 
 # States
 ORDER_NUM, CLIENT_NAME, PRODUCTS, PAYMENT_METHOD, ADDRESS = range(5)
 
-# Storage (can be replaced with DB)
+# Storage (temporary, replace with DB if needed)
 orders = []
 
 # Start command
-def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return update.message.reply_text("Welcome to Master Invoicer Bot. Type /newinvoice to begin.")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Welcome to Master Invoicer Bot. Type /newinvoice to begin.")
 
 # Start invoice creation
-def new_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    update.message.reply_text("Enter Order Number:")
+async def new_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Enter Order Number:")
     return ORDER_NUM
 
-def order_num(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def order_num(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['order_num'] = update.message.text
-    update.message.reply_text("Enter Client Name (must end with - M):")
+    await update.message.reply_text("Enter Client Name (must end with - M):")
     return CLIENT_NAME
 
-def client_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def client_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['client_name'] = update.message.text
-    update.message.reply_text("Enter Products (e.g., 1P #CODE Name $Price):")
+    await update.message.reply_text("Enter Products (e.g., 1P #CODE Name $Price):")
     return PRODUCTS
 
-def products(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def products(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['products'] = update.message.text
     reply_keyboard = [["Cash App", "Zelle", "Chime"]]
-    update.message.reply_text(
+    await update.message.reply_text(
         "Select Payment Method:",
-        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
     )
     return PAYMENT_METHOD
 
-def payment_method(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def payment_method(update: Update, context: ContextTypes.DEFAULT_TYPE):
     method = update.message.text.lower()
     context.user_data['payment_method'] = method
-    update.message.reply_text("Enter Address:")
+    await update.message.reply_text("Enter Address:")
     return ADDRESS
 
-def address(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def address(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['address'] = update.message.text
     data = context.user_data
 
-    # Basic shipping logic
     shipping = 20
 
-    # Calculate total
-    import re, math
+    # Calculate total from product prices
     product_lines = data['products'].split('\n')
     total = 0
     for line in product_lines:
@@ -71,23 +76,24 @@ def address(update: Update, context: ContextTypes.DEFAULT_TYPE):
 {data['client_name']}
 {data['products']}
 
-SHIPPING $20
-{data['payment_method'].capitalize()} {int(fee_percent*100)}% fee : ${fee}
+Shipping: ${shipping}
+{data['payment_method'].capitalize()} {int(fee_percent * 100)}% fee : ${fee}
 
 Total: ${total + fee}
 
 Addy
 {data['address']}
 """
+
     orders.append(invoice)
-    update.message.reply_text(invoice)
+    await update.message.reply_text(invoice)
     return ConversationHandler.END
 
-def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    update.message.reply_text("Invoice canceled.")
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Invoice canceled.")
     return ConversationHandler.END
 
-import os
+# Build the bot
 app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
 
 conv_handler = ConversationHandler(
@@ -106,3 +112,4 @@ app.add_handler(CommandHandler('start', start))
 app.add_handler(conv_handler)
 
 app.run_polling()
+
