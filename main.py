@@ -1,12 +1,10 @@
+import os
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, ContextTypes,
-    MessageHandler, filters, ConversationHandler
+    ApplicationBuilder, CommandHandler, MessageHandler, ConversationHandler,
+    ContextTypes, filters
 )
-
-import os
-import re
-import math
+import re, math
 
 # States
 ORDER_NUM, CLIENT_NAME, PRODUCTS, PAYMENT_METHOD, ADDRESS = range(5)
@@ -35,7 +33,7 @@ async def products(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_keyboard = [["Cash App", "Zelle", "Chime"]]
     await update.message.reply_text(
         "Select Payment Method:",
-        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
     )
     return PAYMENT_METHOD
 
@@ -57,7 +55,6 @@ async def address(update: Update, context: ContextTypes.DEFAULT_TYPE):
             total += int(match.group(1))
 
     total += shipping
-
     fee_rate = {"cash app": 0.05, "zelle": 0.04, "chime": 0.03}
     fee_percent = fee_rate.get(data['payment_method'], 0)
     fee = math.ceil(total * fee_percent)
@@ -85,7 +82,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Invoice canceled.")
     return ConversationHandler.END
 
-# Build app
+# Create app and handlers
 app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
 
 conv_handler = ConversationHandler(
@@ -103,5 +100,18 @@ conv_handler = ConversationHandler(
 app.add_handler(CommandHandler("start", start))
 app.add_handler(conv_handler)
 
-app.run_polling()
+# Start webhook
+if __name__ == '__main__':
+    import asyncio
+    async def main():
+        await app.initialize()
+        await app.start()
+        await app.updater.start_webhook(
+            listen="0.0.0.0",
+            port=int(os.environ.get('PORT', 10000)),
+            url_path=os.environ['BOT_TOKEN'],
+            webhook_url=f"https://{os.environ['RENDER_EXTERNAL_HOSTNAME']}/{os.environ['BOT_TOKEN']}"
+        )
+        await app.updater.idle()
 
+    asyncio.run(main())
